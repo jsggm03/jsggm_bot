@@ -24,6 +24,12 @@ openai.api_key = api_key
 # 4. Streamlit 앱 UI 예시 (간단히)
 st.title("Chatbot Example")
 
+# 이미지 경로 지정 (images 폴더 안에 있을 경우)
+image_path = os.path.join("images", "ask_me_chatbot.png")
+
+# 이미지 표시
+st.image(image_path, caption="Ask Me Chatbot", use_column_width=True)
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
