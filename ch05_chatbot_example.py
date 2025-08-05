@@ -9,98 +9,42 @@ import openai
 import streamlit as st
 from streamlit_chat import message
 
-# 1) .env 파일 읽기
+# 1. .env 파일 로드
 load_dotenv()
 
-# 2) 환경변수에서 API 키 가져오기
+# 2. 환경변수에서 OpenAI API 키 읽기
 api_key = os.getenv("OPENAI_API_KEY")
+if api_key is None:
+    st.error("OpenAI API 키가 설정되어 있지 않습니다. .env 파일을 확인하세요.")
+    st.stop()
 
-# 3) OpenAI 클라이언트 생성 시 키 사용
-client = openai.OpenAI(api_key=api_key)
+# 3. OpenAI API 키 설정
+openai.api_key = api_key
 
-def get_embedding(text):
-    response = client.embeddings.create(
-        input=text,
-        model='text-embedding-ada-002'
-    )
-    return response.data[0].embedding
+# 4. Streamlit 앱 UI 예시 (간단히)
+st.title("Chatbot Example")
 
-folder_path = './data'
-file_name = 'embedding.csv'
-file_path = os.path.join(folder_path, file_name)
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-if os.path.isfile(file_path):
-    print(f"{file_name} 파일이 존재합니다.")
-    df = pd.read_csv(file_path)
-    df['embedding'] = df['embedding'].apply(ast.literal_eval)
-else:
-    txt_files = [file for file in os.listdir(folder_path) if file.endswith('.txt')]
-    data = []
-    for file in txt_files:
-        file_path = os.path.join(folder_path, file)
-        with open(file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
-            data.append(text)
+user_input = st.text_input("메시지를 입력하세요.")
 
-    df = pd.DataFrame(data, columns=['text'])
-    df['embedding'] = df.apply(lambda row: get_embedding(row.text), axis=1)
-    df.to_csv(file_path, index=False, encoding='utf-8-sig')
+if user_input:
+    # 사용자 메시지 저장
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-def cos_sim(A, B):
-    return dot(A, B) / (norm(A) * norm(B))
+    # OpenAI API 호출
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=st.session_state.messages
+        )
+        assistant_message = response.choices[0].message.content
+        st.session_state.messages.append({"role": "assistant", "content": assistant_message})
+    except Exception as e:
+        st.error(f"OpenAI API 호출 중 오류가 발생했습니다: {e}")
 
-def return_answer_candidate(df, query):
-    query_embedding = get_embedding(query)
-    df["similarity"] = df.embedding.apply(lambda x: cos_sim(np.array(x), np.array(query_embedding)))
-    top_three_doc = df.sort_values("similarity", ascending=False).head(3)
-    return top_three_doc
-
-def create_prompt(df, query):
-    result = return_answer_candidate(df, query)
-    system_role = f"""You are an artificial intelligence language model named "정채기" that specializes in summarizing \
-    and answering documents about Seoul's youth policy, developed by developers 유원준 and 안상준.
-    You need to take a given document and return a very detailed summary of the document in the query language.
-    Here are the document: 
-            doc 1 :{str(result.iloc[0]['text'])}
-            doc 2 :{str(result.iloc[1]['text'])}
-            doc 3 :{str(result.iloc[2]['text'])}
-    You must return in Korean. Return a accurate answer based on the document.
-    """
-    user_content = f"""User question: "{str(query)}". """
-
-    messages = [
-        {"role": "system", "content": system_role},
-        {"role": "user", "content": user_content}
-    ] 
-    return messages
-
-def generate_response(messages):
-    result = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-        temperature=0.4,
-        max_tokens=500)
-    return result.choices[0].message.content
-
-st.image('images/ask_me_chatbot.png')
-
-if 'generated' not in st.session_state:
-    st.session_state['generated'] = []
-
-if 'past' not in st.session_state:
-    st.session_state['past'] = []
-
-with st.form('form', clear_on_submit=True):
-    user_input = st.text_input('정책을 물어보세요!', '', key='input')
-    submitted = st.form_submit_button('Send')
-
-if submitted and user_input:
-    prompt = create_prompt(df, user_input)
-    chatbot_response = generate_response(prompt)
-    st.session_state['past'].append(user_input)
-    st.session_state['generated'].append(chatbot_response)
-
-if st.session_state['generated']:
-    for i in reversed(range(len(st.session_state['generated']))):
-        message(st.session_state['past'][i], is_user=True, key=str(i) + '_user')
-        message(st.session_state['generated'][i], key=str(i))
+# 메시지 출력 (streamlit-chat 패키지 사용)
+for msg in st.session_state.messages:
+    is_user = msg["role"] == "user"
+    message(msg["content"], is_user=is_user)
