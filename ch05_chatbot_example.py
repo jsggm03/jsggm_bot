@@ -21,18 +21,22 @@ if api_key is None:
 # 3. OpenAI API 키 설정
 openai.api_key = api_key
 
-# 4. Streamlit 앱 UI 예시 (간단히)
+# 4. Streamlit 앱 UI
 st.title("Chatbot Example")
 
-# 이미지 경로 지정 (images 폴더 안에 있을 경우)
+# 5. 이미지 경로 지정 및 표시 (images 폴더에 ask_me_chatbot.png가 있는 경우)
 image_path = os.path.join("images", "ask_me_chatbot.png")
 
-# 이미지 표시
-st.image(image_path, caption="Ask Me Chatbot", use_column_width=True)
+if os.path.exists(image_path):
+    st.image(image_path, caption="Ask Me Chatbot", use_container_width=True)
+else:
+    st.warning(f"이미지 파일을 찾을 수 없습니다: {image_path}")
 
+# 6. 메시지 상태 초기화
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# 7. 사용자 입력 받기
 user_input = st.text_input("메시지를 입력하세요.")
 
 if user_input:
@@ -50,7 +54,7 @@ if user_input:
     except Exception as e:
         st.error(f"OpenAI API 호출 중 오류가 발생했습니다: {e}")
 
-# 메시지 출력 (streamlit-chat 패키지 사용)
+# 8. 대화 내용 출력
 for msg in st.session_state.messages:
     is_user = msg["role"] == "user"
     message(msg["content"], is_user=is_user)
